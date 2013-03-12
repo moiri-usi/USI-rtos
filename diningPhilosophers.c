@@ -41,8 +41,9 @@ int main (void) {
     int wait_time = 0;
     int nseconds = 0;
     int eat_cnt[MAX_PHILOS];
+    int i;
     
-    for(int i=0; i<MAX_PHILOS; i++) {
+    for(i=0; i<MAX_PHILOS; i++) {
         eat_cnt[i] = 0;
     }
     
@@ -66,13 +67,13 @@ int main (void) {
             philo_cnt, wait_time, nseconds);
     
     /* create binary semaphores */
-    for (int i=0; i<philo_cnt; i++) {
+    for (i=0; i<philo_cnt; i++) {
         sidFork[i] = semBCreate(SEM_Q_FIFO, SEM_EMPTY);
     }
     waiter = semCCreate(SEM_Q_FIFO, 4);
 
     /* spawn (create and start) tasks */
-    for (int i=0; i<philo_cnt; i++) {
+    for (i=0; i<philo_cnt; i++) {
         tidPhilosopher[i] = taskSpawn("tPhilosopher", 200, 0, STACK_SIZE,
                 (FUNCPTR)philosopher, i, philo_cnt, wait_time, eat_cnt, 0, 0, 0, 0, 0, 0);
     }
@@ -81,16 +82,16 @@ int main (void) {
     taskDelay(nseconds*60);
     
     /* delete tasks and semaphores */
-    for (int i=0; i<philo_cnt; i++) {
+    for (i=0; i<philo_cnt; i++) {
         taskDelete(tidPhilosopher[i]);
     }
-    for (int i=0; i<philo_cnt; i++) {
+    for (i=0; i<philo_cnt; i++) {
         semDelete(sidFork[i]);
     }
 
     printf("\n\nAll philosophers stopped.\n");	
     printf("Eat counters:");	
-    for(int i=0; i<philo_cnt; i++) {
+    for(i=0; i<philo_cnt; i++) {
         printf(" %d", eat_cnt[i]);
     }
     printf("\n\n");	
@@ -123,8 +124,4 @@ void philosopher(int id, int max_philo, int delayTicks, int *eat_cnt[MAX_PHILOS]
         semGive(sidFork[right]);
         semGive(waiter, WAIT_FOREVER);
     };
-}
-
-void takeFork(int id) {
-    semTake(sidFork[id], WAIT_FOREVER);
 }
