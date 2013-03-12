@@ -28,7 +28,7 @@ SEM_ID sidFork[MAX_PHILOS];
 SEM_ID waiter;	
 
 /* function declarations */
-void philosopher(int id, int max_philo, int delayTicksi, int *eat_cnt[MAX_PHILOS]);
+void philosopher(int id, int max_philo, int delayTicksi, int *eat_cnt);
 
 
 /*************************************************************************/
@@ -48,17 +48,17 @@ int main (void) {
     }
     
     /* get number of philosophers */ 
-    while ((nseconds < MIN_PHILOS) || (nseconds > MAX_PHILOS)) {
+    while ((philo_cnt < MIN_PHILOS) || (philo_cnt > MAX_PHILOS)) {
         printf("Enter number of philosophers [%d-%d]: ", MIN_PHILOS, MAX_PHILOS);
         scanf("%d", &philo_cnt);
     };
     /* get the waiting time to grab the second fork */ 
-    while ((nseconds < 1) || (nseconds > MAX_WAIT)) {
+    while ((wait_time < 1) || (wait_time > MAX_WAIT)) {
         printf("Enter waiting time [1-%d ticks]: ", MAX_WAIT);
         scanf("%d", &wait_time);
     };
     /* get the simulation time */ 
-    while ((nsecondsi < 1) || (nseconds > MAX_SIM)) {
+    while ((nseconds < 1) || (nseconds > MAX_SIM)) {
         printf("Enter overall simulation time [1-%d s]: ", MAX_SIM);
         scanf("%d", &nseconds);
     };
@@ -104,7 +104,7 @@ int main (void) {
 /*                                                                       */
 /*************************************************************************/
 
-void philosopher(int id, int max_philo, int delayTicks, int *eat_cnt[MAX_PHILOS]) {
+void philosopher(int id, int max_philo, int delayTicks, int *eat_cnt) {
     while (1) {
         int left, right;
         left = id;
@@ -122,6 +122,6 @@ void philosopher(int id, int max_philo, int delayTicks, int *eat_cnt[MAX_PHILOS]
         eat_cnt[id]++;
         semGive(sidFork[left]);
         semGive(sidFork[right]);
-        semGive(waiter, WAIT_FOREVER);
+        semGive(waiter);
     };
 }
