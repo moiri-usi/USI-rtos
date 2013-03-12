@@ -1,5 +1,5 @@
 /*************************************************************************/
-/*  dinigPhiosphers.c                                                    */
+/*  diningPhiosphers.c                                                    */
 /*                                                                       */
 /*************************************************************************/
 
@@ -28,7 +28,7 @@ SEM_ID sidFork[MAX_PHILOS];
 SEM_ID waiter;	
 
 /* function declarations */
-void philosopher(int id, int max_philo, int delayTicksi, int *eat_cnt);
+void philosopher(int id, int max_philo, int delayTicks, int *eat_cnt);
 
 
 /*************************************************************************/
@@ -74,8 +74,8 @@ int main (void) {
 
     /* spawn (create and start) tasks */
     for (i=0; i<philo_cnt; i++) {
-        tidPhilosopher[i] = taskSpawn("tPhilosopher", 200, 0, STACK_SIZE,
-                (FUNCPTR)philosopher, i, philo_cnt, wait_time, eat_cnt, 0, 0, 0, 0, 0, 0);
+        tidPhilosopher[i] = taskSpawn("tPhilosopher_" + (char)i, 200, 0, STACK_SIZE,
+                (FUNCPTR)philosopher, i, philo_cnt, wait_time, (_Vx_usr_arg_t)eat_cnt, 0, 0, 0, 0, 0, 0);
     }
 
     /* run for the given simulation time */
