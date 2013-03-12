@@ -68,7 +68,7 @@ int main (void) {
     
     /* create binary semaphores */
     for (i=0; i<philo_cnt; i++) {
-        sidFork[i] = semBCreate(SEM_Q_FIFO, SEM_EMPTY);
+        sidFork[i] = semBCreate(SEM_Q_FIFO, SEM_FULL);
     }
     waiter = semCCreate(SEM_Q_FIFO, 4);
 
