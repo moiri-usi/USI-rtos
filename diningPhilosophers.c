@@ -75,7 +75,7 @@ int main (void) {
     /* spawn (create and start) tasks */
     for (i=0; i<philo_cnt; i++) {
         tidPhilosopher[i] = taskSpawn("tPhilosopher_" + (char)i, 200, 0, STACK_SIZE,
-                (FUNCPTR)philosopher, i, philo_cnt, wait_time, eat_cnt, 0, 0, 0, 0, 0, 0);
+                (FUNCPTR)philosopher, i, philo_cnt, wait_time, (int)eat_cnt, 0, 0, 0, 0, 0, 0);
     }
 
     /* run for the given simulation time */
