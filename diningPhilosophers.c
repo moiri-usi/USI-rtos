@@ -10,6 +10,7 @@
 #include "stdlib.h"
 #include "semLib.h"
 #include "taskLib.h"
+#include "kernelLib.h"
 
 /* defines */
 #define THINK_TIME   50     // ticks
@@ -19,6 +20,7 @@
 #define STACK_SIZE   20000
 #define MIN_PHILOS   3
 #define MAX_PHILOS   20
+#define TIMESLICE    6
 
 /* task IDs */
 int tidPhilosopher[MAX_PHILOS];
@@ -42,6 +44,8 @@ int main (void) {
     int nseconds = 0;
     int eat_cnt[MAX_PHILOS];
     int i;
+	
+	kernelTimeSlice(TIMESLICE);
     
     for(i=0; i<MAX_PHILOS; i++) {
         eat_cnt[i] = 0;
