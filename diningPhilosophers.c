@@ -70,7 +70,7 @@ int main (void) {
     for (i=0; i<philo_cnt; i++) {
         sidFork[i] = semBCreate(SEM_Q_FIFO, SEM_FULL);
     }
-    waiter = semCCreate(SEM_Q_FIFO, 4);
+    waiter = semCCreate(SEM_Q_FIFO, philo_cnt-1);
 
     /* spawn (create and start) tasks */
     for (i=0; i<philo_cnt; i++) {
