@@ -276,7 +276,8 @@ void consumer(int comp_time, int max_read_msg) {
     MSG_Q_ID qid;
     bool periodic = true;
     struct timespec mytime;
-    char* src, msgId;
+    char* src;
+    char* msgId;
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
@@ -306,7 +307,7 @@ void consumer(int comp_time, int max_read_msg) {
                 else
                     printf("Error: unknown source\n");
 
-                msgId = (char)malloc(strlen(msgBuf));
+                msgId = malloc(strlen(msgBuf));
                 strcpy(msgId, msgBuf+1);
                 printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
                         msgId, src, (int)mytime.tv_sec);
