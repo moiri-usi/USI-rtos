@@ -298,7 +298,8 @@ void consumer(int comp_time, int max_read_msg) {
                 qid = (periodic) ? qidAperiodic : qidPeriodic;
             }
             else if (byteCnt < 0)
-                printf("Error msgQReceive: %s\n", ERROR);
+                printf("Error msgQReceive: %d\n", byteCnt);
+                break;
             else {
                 if (msgBuf[0] == TYPE_PERIODIC)
                     src = STR_PERIODIC;
@@ -313,7 +314,7 @@ void consumer(int comp_time, int max_read_msg) {
                         msgId, src, (int)mytime.tv_sec);
             }
         }
-        periodic = (periodic) ? false : true; //periodic != periodic;
+        periodic = (periodic) ? false : true; //periodic = !periodic;
     };
 }
 
