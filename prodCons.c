@@ -182,7 +182,7 @@ void prodPeriodic(int period) {
 	struct itimerspec intervaltimer;
 
     /* create message queue */
-    if ((qidPeriodic = msgQCreate (MAX_DEPHT, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
+    if ((qidPeriodic = msgQCreate (MAX_DEPTH, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
 		printf("Error msgQCreate\n");
 	else
 		printf("Queue for periodic producer created.\n");
@@ -306,13 +306,13 @@ void consumer(int comp_time, int max_read_msg) {
                 else
                     printf("Error: unknown source\n");
 
-                msgId = (char*)malloc(strlen(msgBuf));
+                msgId = (char)malloc(strlen(msgBuf));
                 strcpy(msgId, msgBuf+1);
-                printf(IDENT + "CONSUMER: message #%s from %s @ %ds.\n",
+                printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
                         msgId, src, (int)mytime.tv_sec);
             }
         }
-        periodic != periodic;
+        periodic = (periodic) ? false : true; //periodic != periodic;
     };
 }
 
@@ -340,7 +340,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
 
-    printf(STR_PERIODIC + ": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_PERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
 }
 
 
@@ -349,7 +349,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
 /*                                                                       */
 /*************************************************************************/
 
-void timerHandlerAperiodic(timer_t callingtimer, MSG_Q_ID myMsgQId) {
+void timerHandlerAperiodic(timer_t callingtimer) {
     struct timespec mytime;
     char* msgId;
     char* msg;
@@ -367,7 +367,7 @@ void timerHandlerAperiodic(timer_t callingtimer, MSG_Q_ID myMsgQId) {
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
 
-    printf(STR_APERIODIC + ": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_APERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
 }
   
 /*************************************************************************/
