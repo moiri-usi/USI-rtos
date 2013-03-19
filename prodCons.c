@@ -282,13 +282,14 @@ void consumer(int comp_time, int max_read_msg) {
         printf("Error: clock_gettime \n");
 
     while (1) {
-        taskDelay(comp_time);
+        taskDelay(comp_time*60);
         qid = (periodic) ? qidPeriodic : qidAperiodic;
         zeroCnt = 0;
         for (i=0; i<max_read_msg; i++) {
             /* get message from queue */
             byteCnt = msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT);
             if (byteCnt == 0) {
+                printf("Queue empty\n");
                 zeroCnt++;
                 if (zeroCnt >= 2)
                     break; // both queues are empty
@@ -301,6 +302,7 @@ void consumer(int comp_time, int max_read_msg) {
                 break;
             }
             else {
+                printf("Bytes read: %d\n", byteCnt);
                 if (msgBuf[0] == TYPE_PERIODIC)
                     src = STR_PERIODIC;
                 else if (msgBuf[0] == TYPE_APERIODIC)
