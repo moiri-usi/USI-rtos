@@ -289,7 +289,7 @@ void consumer(int comp_time, int max_read_msg) {
         for (i=0; i<max_read_msg; i++) {
             /* get message from queue */
             if (msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT) == ERROR) {
-                if (ERRNO == S_objLib_OBJ_UNAVAILABLE) {
+                if (errno == S_objLib_OBJ_UNAVAILABLE) {
                     printf("Queue empty\n");
                     zeroCnt++;
                     if (zeroCnt >= 2)
