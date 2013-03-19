@@ -298,7 +298,7 @@ void consumer(int comp_time, int max_read_msg) {
                 qid = (periodic) ? qidAperiodic : qidPeriodic;
             }
             else if (byteCnt < 0)
-                printf("Error msgQReceive: %d\n", byteCnt);
+                printf("Error msgQReceive: %s\n", ERROR);
             else {
                 if (msgBuf[0] == TYPE_PERIODIC)
                     src = STR_PERIODIC;
@@ -344,7 +344,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
 
 
 /*************************************************************************/
-/*  function "TimerHandlerAperiodic"                                      */
+/*  function "TimerHandlerAperiodic"                                     */
 /*                                                                       */
 /*************************************************************************/
 
