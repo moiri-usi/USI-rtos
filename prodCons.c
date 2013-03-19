@@ -334,9 +334,11 @@ void timerHandlerPeriodic(timer_t callingtimer) {
     printf("periodic: set msg\n");
     sprintf(msg, "%s%d", TYPE_PERIODIC, msgCnt);
 
+    printf("periodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
 
+    printf("periodic: send msg\n");
     /* send a normal priority message, blocking if queue is full */
     if (msgQSend (qidPeriodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
@@ -361,9 +363,11 @@ void timerHandlerAperiodic(timer_t callingtimer) {
     printf("aperiodic: set msg\n");
     sprintf(msg, "%s%d", TYPE_APERIODIC, msgCnt);
 
+    printf("aperiodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
 
+    printf("aperiodic: send msg\n");
     /* send a normal priority message, blocking if queue is full */
     if (msgQSend (qidAperiodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
