@@ -25,7 +25,7 @@
 #define MIN_MSG       2
 #define MAX_MSG       100
 #define TIMESLICE     6 // set time slice to 100 ms
-#define MAX_MSG_LEN   35
+#define MAX_MSG_LEN   34
 
 #define TYPE_PERIODIC  'P'
 #define TYPE_APERIODIC 'A'
@@ -325,13 +325,11 @@ void consumer(int comp_time, int max_read_msg) {
 
 void timerHandlerPeriodic(timer_t callingtimer) {
     struct timespec mytime;
-    char msgId[33];
-    char* msg;
+    char msgId[MAX_MSG_LEN-1];
+    char msg[MAX_MSG_LEN];
     msgCnt++;
-    itoa(msgCnt, msgId, 10);
-    msg = malloc(strlen(msgId) + 2);
-    msg[0] = TYPE_PERIODIC;
-    strcpy(msg+1, msgId);
+    sprintf(msgId, "%d", msgCnt);
+    sprintf(msg, TYPE_PERIODIC"%d", msgCnt);
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
@@ -352,13 +350,11 @@ void timerHandlerPeriodic(timer_t callingtimer) {
 
 void timerHandlerAperiodic(timer_t callingtimer) {
     struct timespec mytime;
-    char msgId[33];
-    char* msg;
+    char msgId[MAX_MSG_LEN-1];
+    char msg[MAX_MSG_LEN];
     msgCnt++;
-    itoa(msgCnt, msgId, 10);
-    msg = malloc(strlen(msgId) + 2);
-    msg[0] = TYPE_PERIODIC;
-    strcpy(msg+1, msgId);
+    sprintf(msgId, "%d", msgCnt);
+    sprintf(msg, TYPE_APERIODIC"%d", msgCnt);
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
