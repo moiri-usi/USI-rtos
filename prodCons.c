@@ -13,6 +13,7 @@
 #include "tickLib.h"
 #include "time.h"
 #include "sigLib.h"
+#include "errno.h"
 
 /* defines */
 #define STACK_SIZE    20000
