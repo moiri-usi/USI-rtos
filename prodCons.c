@@ -277,7 +277,6 @@ void consumer(int comp_time, int max_read_msg) {
     bool periodic = true;
     struct timespec mytime;
     char* src;
-    char* msgId;
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
@@ -297,9 +296,10 @@ void consumer(int comp_time, int max_read_msg) {
                 // one queue is empty, switch to the other
                 qid = (periodic) ? qidAperiodic : qidPeriodic;
             }
-            else if (byteCnt < 0)
+            else if (byteCnt < 0) {
                 printf("Error msgQReceive: %d\n", byteCnt);
                 break;
+            }
             else {
                 if (msgBuf[0] == TYPE_PERIODIC)
                     src = STR_PERIODIC;
@@ -308,10 +308,8 @@ void consumer(int comp_time, int max_read_msg) {
                 else
                     printf("Error: unknown source\n");
 
-                msgId = malloc(strlen(msgBuf));
-                strcpy(msgId, msgBuf+1);
                 printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
-                        msgId, src, (int)mytime.tv_sec);
+                        msgBuf+1, src, (int)mytime.tv_sec);
             }
         }
         periodic = (periodic) ? false : true; //periodic = !periodic;
