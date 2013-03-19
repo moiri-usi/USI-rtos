@@ -287,22 +287,21 @@ void consumer(int comp_time, int max_read_msg) {
         zeroCnt = 0;
         for (i=0; i<max_read_msg; i++) {
             /* get message from queue */
-            byteCnt = msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT);
-            if (byteCnt == 0) {
-                printf("Queue empty\n");
-                zeroCnt++;
-                if (zeroCnt >= 2)
-                    break; // both queues are empty
+            if (msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT) == ERROR) {
+                if (ERRNO == S_objLib_OBJ_UNAVAILABLE) {
+                    printf("Queue empty\n");
+                    zeroCnt++;
+                    if (zeroCnt >= 2)
+                        break; // both queues are empty
 
-                // one queue is empty, switch to the other
-                qid = (periodic) ? qidAperiodic : qidPeriodic;
-            }
-            else if (byteCnt < 0) {
-                printf("Error msgQReceive: %d\n", byteCnt);
-                break;
+                    // one queue is empty, switch to the other
+                    qid = (periodic) ? qidAperiodic : qidPeriodic;
+                }
+                else {
+                    printf("Error msgQReceive\n");
+                }
             }
             else {
-                printf("Bytes read: %d\n", byteCnt);
                 if (msgBuf[0] == TYPE_PERIODIC)
                     src = STR_PERIODIC;
                 else if (msgBuf[0] == TYPE_APERIODIC)
