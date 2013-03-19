@@ -53,8 +53,6 @@ void consumer(int, int);
 void timerHandlerPeriodic(timer_t, int*);
 void timerHandlerAperiodic(timer_t, int*);
 
-int msgCnt = 0;
-
 typedef int bool;
 
 
