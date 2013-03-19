@@ -80,10 +80,9 @@ int main(void) {
         printf("Enter overall simulation time [1-%d s]: ", MAX_SECONDS);
         scanf("%d", &nseconds);
     };
-    printf("Simulating for %d seconds.\n\n", nseconds);
+    printf("Simulating for %d seconds.\n", nseconds);
 
     /* get the maximal queue entries for queue #1*/ 
-    printf("\n\n");
     while ((depth_q1 < 1) || (depth_q1 > MAX_DEPTH)) {
         printf("Enter the maximal depth of queue #1 [1-%d]: ", MAX_DEPTH);
         scanf("%d", &depth_q1);
@@ -91,7 +90,6 @@ int main(void) {
     printf("Depth for queue #1 set to %d.\n\n", depth_q1);
 
     /* get the maximal queue entries for queue #2*/ 
-    printf("\n\n");
     while ((depth_q2 < 1) || (depth_q2 > MAX_DEPTH)) {
         printf("Enter the maximal depth of queue #2 [1-%d]: ", MAX_DEPTH);
         scanf("%d", &depth_q2);
@@ -279,9 +277,6 @@ void consumer(int comp_time, int max_read_msg) {
     struct timespec mytime;
     char* src;
 
-    if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
-        printf("Error: clock_gettime \n");
-
     while (1) {
         taskDelay(comp_time*60);
         qid = (periodic) ? qidPeriodic : qidAperiodic;
@@ -290,7 +285,7 @@ void consumer(int comp_time, int max_read_msg) {
             /* get message from queue */
             if (msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT) == ERROR) {
                 if (errno == S_objLib_OBJ_UNAVAILABLE) {
-                    printf("Queue empty\n");
+                    // printf("Queue empty\n");
                     zeroCnt++;
                     if (zeroCnt >= 2)
                         break; // both queues are empty
@@ -309,6 +304,9 @@ void consumer(int comp_time, int max_read_msg) {
                     src = STR_APERIODIC;
                 else
                     printf("Error: unknown source\n");
+
+                if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
+                    printf("Error: clock_gettime \n");
 
                 printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
                         msgBuf+1, src, (int)mytime.tv_sec);
@@ -329,16 +327,16 @@ void timerHandlerPeriodic(timer_t callingtimer) {
     char msgId[MAX_MSG_LEN-1];
     char msg[MAX_MSG_LEN];
     msgCnt++;
-    printf("periodic: set msgId\n");
+    // printf("periodic: set msgId\n");
     sprintf(msgId, "%d", msgCnt);
-    printf("periodic: set msg\n");
+    // printf("periodic: set msg\n");
     sprintf(msg, "%c%d", TYPE_PERIODIC, msgCnt);
 
-    printf("periodic: set time\n");
+    // printf("periodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
 
-    printf("periodic: send msg\n");
+    // printf("periodic: send msg\n");
     /* send a normal priority message, blocking if queue is full */
     if (msgQSend (qidPeriodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
@@ -358,16 +356,16 @@ void timerHandlerAperiodic(timer_t callingtimer) {
     char msgId[MAX_MSG_LEN-1];
     char msg[MAX_MSG_LEN];
     msgCnt++;
-    printf("aperiodic: set msgId\n");
+    // printf("aperiodic: set msgId\n");
     sprintf(msgId, "%d", msgCnt);
-    printf("aperiodic: set msg\n");
+    // printf("aperiodic: set msg\n");
     sprintf(msg, "%c%d", TYPE_APERIODIC, msgCnt);
 
-    printf("aperiodic: set time\n");
+    // printf("aperiodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
 
-    printf("aperiodic: send msg\n");
+    // printf("aperiodic: send msg\n");
     /* send a normal priority message, blocking if queue is full */
     if (msgQSend (qidAperiodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
