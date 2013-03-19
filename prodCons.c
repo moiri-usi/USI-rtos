@@ -80,42 +80,42 @@ int main(void) {
         printf("Enter overall simulation time [1-%d s]: ", MAX_SECONDS);
         scanf("%d", &nseconds);
     };
-    printf("Simulating for %d seconds.\n", nseconds);
+    printf("Simulating for %d seconds.\n\n", nseconds);
 
     /* get the maximal queue entries for queue #1*/ 
     while ((depth_q1 < 1) || (depth_q1 > MAX_DEPTH)) {
-        printf("Enter the maximal depth of queue #1 [1-%d]: ", MAX_DEPTH);
+        printf("Enter depth of periodic queue [1-%d]: ", MAX_DEPTH);
         scanf("%d", &depth_q1);
     };
-    printf("Depth for queue #1 set to %d.\n\n", depth_q1);
+    printf("Depth of periodic queue set to %d entries.\n\n", depth_q1);
 
     /* get the maximal queue entries for queue #2*/ 
     while ((depth_q2 < 1) || (depth_q2 > MAX_DEPTH)) {
-        printf("Enter the maximal depth of queue #2 [1-%d]: ", MAX_DEPTH);
+        printf("Enter depth of aperiodic queue [1-%d]: ", MAX_DEPTH);
         scanf("%d", &depth_q2);
     };
-    printf("Depth for queue #2 set to %d.\n\n", depth_q2);
+    printf("Depth of aperiodic queue set to %d entries.\n\n", depth_q2);
 
     /* get the period for the periodic producer */ 
     while ((period < 1) || (period > MAX_PERIOD)) {
-        printf("Enter period for the periodic producer [1-%d s]: ", MAX_PERIOD);
+        printf("Enter period for periodic producer [1-%d s]: ", MAX_PERIOD);
         scanf("%d", &period);
     };
-    printf("Period for the periodic producer set to %ds. \n\n", period);
+    printf("Period for periodic producer set to %ds. \n\n", period);
 
     /* get the lower bound for the aperiodic timer */ 
     while ((low_bound < 1) || (low_bound > MAX_BOUND)) {
-        printf("Enter lower bound for the aperiodic timer [1-%d s]: ", MAX_BOUND);
+        printf("Enter lower bound for aperiodic timer [1-%d s]: ", MAX_BOUND);
         scanf("%d", &low_bound);
     };
-    printf("Lower bound for the aperiodic timer set to %ds. \n\n", low_bound);
+    printf("Lower bound for aperiodic timer set to %ds. \n\n", low_bound);
 
     /* get the upper bound for the aperiodic timer */ 
     while ((up_bound < MIN_BOUND) || (up_bound > MAX_BOUND)) {
-        printf("Enter upper bound for the aperiodic timer [%d-%d s]: ", MIN_BOUND, MAX_BOUND);
+        printf("Enter upper bound for aperiodic timer [%d-%d s]: ", MIN_BOUND, MAX_BOUND);
         scanf("%d", &up_bound);
     };
-    printf("Upper bound for the aperiodic timer set to %ds. \n\n", up_bound);
+    printf("Upper bound for aperiodic timer set to %ds. \n\n", up_bound);
 
     /* get the consumer computation time */ 
     while ((comp_time < 1) || (comp_time > MAX_COMP_TIME)) {
@@ -126,10 +126,10 @@ int main(void) {
 
     /* get the max number of msgs read per consumer loop */ 
     while ((max_read_msg < MIN_MSG) || (max_read_msg > MAX_MSG)) {
-        printf("Enter max number of msgs read per consumer loop [%d-%d]: ", MIN_MSG, MAX_MSG);
+        printf("Enter max number of messages read per consumer loop [%d-%d]: ", MIN_MSG, MAX_MSG);
         scanf("%d", &max_read_msg);
     };
-    printf("Max number of msgs read per consumer loop set to %d. \n\n", max_read_msg);
+    printf("Max number of messages read per consumer loop set to %d. \n\n", max_read_msg);
 
 
     /* set clock to start at 0 */
@@ -179,6 +179,7 @@ void prodPeriodic(int period) {
 	int i;
 	timer_t ptimer;
 	struct itimerspec intervaltimer;
+    int msgCnt = 0;
 
     /* create message queue */
     if ((qidPeriodic = msgQCreate (MAX_DEPTH, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
@@ -193,7 +194,7 @@ void prodPeriodic(int period) {
 		printf("Timer for periodic producer created.\n");
 
 	/* connect timer to timer handler routine */
-	if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandlerPeriodic, (int)0) == ERROR )
+	if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandlerPeriodic, msgCnt) == ERROR )
 		printf("Error connect_timer\n");
 	else
 		printf("Timer handler for periodic producer connected.\n");
@@ -225,6 +226,7 @@ void prodAperiodic(int low_bound, int up_bound) {
     int period;
     timer_t ptimer;
     struct  itimerspec intervaltimer;
+    int msgCnt = 0;
 
     /* create message queue */
     if ((qidAperiodic = msgQCreate (MAX_DEPTH, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
@@ -239,7 +241,7 @@ void prodAperiodic(int low_bound, int up_bound) {
         printf("Timer for aperiodic producer created.\n");
 
     /* connect timer to timer handler routine */
-    if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandlerAperiodic, (int)0) == ERROR )
+    if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandlerAperiodic, msgCnt) == ERROR )
         printf("Error connect_timer\n");
     else
         printf("Timer handler for aperiodic producer connected.\n");
@@ -308,7 +310,7 @@ void consumer(int comp_time, int max_read_msg) {
                 if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
                     printf("Error: clock_gettime \n");
 
-                printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
+                printf(IDENT"CONSUMER: message #%03s from %s @ %03ds.\n",
                         msgBuf+1, src, (int)mytime.tv_sec);
             }
         }
@@ -322,15 +324,15 @@ void consumer(int comp_time, int max_read_msg) {
 /*                                                                       */
 /*************************************************************************/
 
-void timerHandlerPeriodic(timer_t callingtimer) {
+void timerHandlerPeriodic(timer_t callingtimer, int &msgCnt) {
     struct timespec mytime;
     char msgId[MAX_MSG_LEN-1];
     char msg[MAX_MSG_LEN];
-    msgCnt++;
     // printf("periodic: set msgId\n");
     sprintf(msgId, "%d", msgCnt);
     // printf("periodic: set msg\n");
     sprintf(msg, "%c%d", TYPE_PERIODIC, msgCnt);
+    msgCnt++;
 
     // printf("periodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
@@ -342,7 +344,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
 
-    printf(STR_PERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_PERIODIC": message #%03s @ %03ds.\n", msgId, (int)mytime.tv_sec);
 }
 
 
@@ -351,15 +353,15 @@ void timerHandlerPeriodic(timer_t callingtimer) {
 /*                                                                       */
 /*************************************************************************/
 
-void timerHandlerAperiodic(timer_t callingtimer) {
+void timerHandlerAperiodic(timer_t callingtimer, int &msgCnt) {
     struct timespec mytime;
     char msgId[MAX_MSG_LEN-1];
     char msg[MAX_MSG_LEN];
-    msgCnt++;
     // printf("aperiodic: set msgId\n");
     sprintf(msgId, "%d", msgCnt);
     // printf("aperiodic: set msg\n");
     sprintf(msg, "%c%d", TYPE_APERIODIC, msgCnt);
+    msgCnt++;
 
     // printf("aperiodic: set time\n");
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
@@ -371,7 +373,7 @@ void timerHandlerAperiodic(timer_t callingtimer) {
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
 
-    printf(STR_APERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_APERIODIC": message #%03s @ %03ds.\n", msgId, (int)mytime.tv_sec);
 }
   
 /*************************************************************************/
