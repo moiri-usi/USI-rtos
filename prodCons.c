@@ -50,8 +50,8 @@ MSG_Q_ID qidAperiodic;
 void prodPeriodic(int);
 void prodAperiodic(int, int);
 void consumer(int, int);
-void timerHandlerPeriodic(timer_t);
-void timerHandlerAperiodic(timer_t);
+void timerHandlerPeriodic(timer_t, int);
+void timerHandlerAperiodic(timer_t, int);
 
 int msgCnt = 0;
 
