@@ -329,7 +329,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
     char msg[MAX_MSG_LEN];
     msgCnt++;
     sprintf(msgId, "%d", msgCnt);
-    sprintf(msg, TYPE_PERIODIC"%d", msgCnt);
+    sprintf(msg, "%s%d", TYPE_PERIODIC, msgCnt);
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
@@ -354,7 +354,7 @@ void timerHandlerAperiodic(timer_t callingtimer) {
     char msg[MAX_MSG_LEN];
     msgCnt++;
     sprintf(msgId, "%d", msgCnt);
-    sprintf(msg, TYPE_APERIODIC"%d", msgCnt);
+    sprintf(msg, "%s%d", TYPE_APERIODIC, msgCnt);
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) 
         printf("Error: clock_gettime \n");
