@@ -325,7 +325,7 @@ void consumer(int comp_time, int max_read_msg) {
 
 void timerHandlerPeriodic(timer_t callingtimer) {
     struct timespec mytime;
-    char* msgId;
+    char msgId[33];
     char* msg;
     msgCnt++;
     itoa(msgCnt, msgId, 10);
@@ -352,7 +352,7 @@ void timerHandlerPeriodic(timer_t callingtimer) {
 
 void timerHandlerAperiodic(timer_t callingtimer) {
     struct timespec mytime;
-    char* msgId;
+    char msgId[33];
     char* msg;
     msgCnt++;
     itoa(msgCnt, msgId, 10);
