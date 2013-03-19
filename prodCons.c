@@ -25,6 +25,7 @@
 #define MIN_MSG       2
 #define MAX_MSG       100
 #define TIMESLICE     6 // set time slice to 100 ms
+#define MAX_MSG_LEN   35
 
 #define TYPE_PERIODIC  'P'
 #define TYPE_APERIODIC 'A'
@@ -32,6 +33,8 @@
 #define STR_APERIODIC  "APERIODIC"
 
 #define IDENT "                               "
+#define true  1
+#define false 0
 
 /* task IDs */
 int tidProdPeriodic;			
@@ -50,6 +53,8 @@ void timerHandlerPeriodic(timer_t);
 void timerHandlerAperiodic(timer_t);
 
 int msgCnt = 0;
+
+typedef int bool;
 
 
 /*************************************************************************/
@@ -157,7 +162,9 @@ int main(void) {
     taskDelay(nseconds*60);
 
     /* delete task */
-    taskDelete(tidPeriodic);
+    taskDelete(tidProdPeriodic);
+    taskDelete(tidProdAperiodic);
+    taskDelete(tidConsumer);
 
     printf("Exiting. \n\n");
     return(0);
@@ -175,7 +182,7 @@ void prodPeriodic(int period) {
 	struct itimerspec intervaltimer;
 
     /* create message queue */
-    if ((myMsgQId = msgQCreate (MAX_MSGS, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
+    if ((qidPeriodic = msgQCreate (MAX_DEPHT, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
 		printf("Error msgQCreate\n");
 	else
 		printf("Queue for periodic producer created.\n");
@@ -221,7 +228,7 @@ void prodAperiodic(int low_bound, int up_bound) {
     struct  itimerspec intervaltimer;
 
     /* create message queue */
-    if ((myMsgQId = msgQCreate (MAX_MSGS, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
+    if ((qidAperiodic = msgQCreate (MAX_DEPTH, MAX_MSG_LEN, MSG_Q_PRIORITY)) == NULL)
 		printf("Error msgQCreate\n");
 	else
 		printf("Queue for aperiodic producer created.\n");
@@ -283,7 +290,7 @@ void consumer(int comp_time, int max_read_msg) {
             byteCnt = msgQReceive(qid, msgBuf, MAX_MSG_LEN, NO_WAIT);
             if (byteCnt == 0) {
                 zeroCnt++;
-                if zeroCnt >= 2
+                if (zeroCnt >= 2)
                     break; // both queues are empty
 
                 // one queue is empty, switch to the other
@@ -299,9 +306,9 @@ void consumer(int comp_time, int max_read_msg) {
                 else
                     printf("Error: unknown source\n");
 
-                msgId = malloc(strlen(msgBuf));
-                strcpy(msgId, msgBuf+1)
-                printf(IDENT"CONSUMER: message #%s from %s @ %ds.\n",
+                msgId = (char*)malloc(strlen(msgBuf));
+                strcpy(msgId, msgBuf+1);
+                printf(IDENT + "CONSUMER: message #%s from %s @ %ds.\n",
                         msgId, src, (int)mytime.tv_sec);
             }
         }
@@ -332,9 +339,8 @@ void timerHandlerPeriodic(timer_t callingtimer) {
     if (msgQSend (qidPeriodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
-    }
 
-    printf(STR_PERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_PERIODIC + ": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
 }
 
 
@@ -360,9 +366,8 @@ void timerHandlerAperiodic(timer_t callingtimer, MSG_Q_ID myMsgQId) {
     if (msgQSend (qidAperiodic, msg, sizeof(msg), WAIT_FOREVER,
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
-    }
 
-    printf(STR_APERIODIC": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_APERIODIC + ": message #%s @ %ds.\n", msgId, (int)mytime.tv_sec);
 }
   
 /*************************************************************************/
