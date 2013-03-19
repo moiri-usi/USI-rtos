@@ -156,7 +156,7 @@ int main(void) {
 
     /* spawn (create and start) task */
     tidConsumer = taskSpawn("tConsumer", 100, 0, STACK_SIZE,
-        (FUNCPTR)consumer, max_read_msg, comp_time, 0, 0, 0, 0, 0, 0, 0, 0);
+        (FUNCPTR)consumer, comp_time, max_read_msg, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /* run for given simulation time */
     taskDelay(nseconds*60);
