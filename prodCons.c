@@ -33,7 +33,7 @@
 #define STR_PERIODIC   "PERIODIC"
 #define STR_APERIODIC  "APERIODIC"
 
-#define IDENT "                               "
+#define IDENT "                                 "
 #define true  1
 #define false 0
 
@@ -52,6 +52,7 @@ void prodAperiodic(int, int);
 void consumer(int, int);
 void timerHandlerPeriodic(timer_t, int*);
 void timerHandlerAperiodic(timer_t, int*);
+int random_in_range (unsigned int, unsigned int);
 
 typedef int bool;
 
@@ -342,7 +343,7 @@ void timerHandlerPeriodic(timer_t callingtimer, int* msgCnt) {
                 MSG_PRI_NORMAL) == ERROR)
         printf("Error: msgQSend\n");
 
-    printf(STR_PERIODIC": message #%03s @ %03ds.\n", msgId, (int)mytime.tv_sec);
+    printf(STR_PERIODIC":  message #%03s @ %03ds.\n", msgId, (int)mytime.tv_sec);
 }
 
 
@@ -385,11 +386,12 @@ void timerHandlerAperiodic(timer_t callingtimer, int* msgCnt) {
 int random_in_range (unsigned int min, unsigned int max)
 {
     int base_random = rand(); /* in [0, RAND_MAX] */
+	/* now guaranteed to be in [0, RAND_MAX) */
+	int range = max - min;
+	int remainder = RAND_MAX % range;
+	int bucket    = RAND_MAX / range;
     if (RAND_MAX == base_random) return random_in_range(min, max);
-    /* now guaranteed to be in [0, RAND_MAX) */
-    int range = max - min,
-    remainder = RAND_MAX % range,
-    bucket    = RAND_MAX / range;
+  
     /* There are range buckets, plus one smaller interval
     *      within remainder of RAND_MAX */
     if (base_random < RAND_MAX - remainder) {
