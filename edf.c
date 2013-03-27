@@ -23,11 +23,11 @@
 #define MAX_SECONDS   1000
 #define MAX_PERIODIC  3
 #define MAX_APERIODIC 3
-#define MAX_PENDING   (MAX_PERIODIC)
-#define MAX_READY     (MAX_PERIODIC)
+#define MAX_PENDING   (MAX_PERIODIC + MAX_APERIODIC)
+#define MAX_READY     (MAX_PERIODIC + MAX_APERIODIC)
 #define MAX_PERIOD    100
 #define MAX_DEADLINE  100
-#define MAX_PRIO      103
+#define MAX_PRIO      104
 #define MIN_PRIO      255
 
 #define ET_ARRIVE   0
@@ -73,14 +73,16 @@ typedef struct queue_time_event_param {
 /* task IDs */
 int tidTimerMux;
 int tidScheduler;
+int tidServer;
 
 /* queue IDs */
 MSG_Q_ID qidTimeEvents;
 
 /* function declarations */
-void timerMux(t_param*, int);
+void timerMux(te_param*);
 void timerHandler(timer_t, te_param*);
 void scheduler();
+void server(te_param*);
 void periodic(int);
 void print_log_prefix(int);
 
@@ -98,6 +100,7 @@ int main(void) {
     int     nseconds = 0;
     int     i;
     t_param t_params[MAX_PERIODIC];
+	te_param te_params;
     char t_name[20];
 
     /* get the simulation time */ 
@@ -141,6 +144,15 @@ int main(void) {
     /* set clock to start at 0 */
     mytime.tv_sec  = 0;
     mytime.tv_nsec = 0;
+	
+	/* initialize timing event parameters */
+	te_params.t_params = t_param;
+	for (i=0; i<MAX_PENDING; i++) {
+		te_params.tp_params[i].is_set = (i < task_cnt) ? true : false;
+		te_params.tp_params[i].is_periodic = true;
+		te_params.tp_params[i].qt.tv_sec = 0;
+		te_params.tp_params[i].qt.tv_nsec = 1;
+	}
 
     if (clock_settime(CLOCK_REALTIME, &mytime) < 0)
         printf("Error clock_settime\n");
@@ -150,10 +162,14 @@ int main(void) {
 
     /* spawn (create and start) timer task */
     tidTimerMux = taskSpawn("tTimerMux", 101, 0, STACK_SIZE,
-        (FUNCPTR)timerMux, (int)t_params, task_cnt, 0, 0, 0, 0, 0, 0, 0, 0);
+        (FUNCPTR)timerMux, (int)&te_params, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+		
+	/* spawn (create and start) server task */
+	tidTimerMux = taskSpawn("tServer", 102, 0, STACK_SIZE,
+		(FUNCPTR)server, (int)&te_params, (int)&utilisation, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /* create scheduler task */
-    tidScheduler = taskCreate("tScheduler", 102, 0, STACK_SIZE,
+    tidScheduler = taskCreate("tScheduler", 103, 0, STACK_SIZE,
         (FUNCPTR)scheduler, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /* create periodic tasks */
@@ -184,11 +200,10 @@ int main(void) {
 /*                                                                       */
 /*************************************************************************/
 
-void timerMux(t_param* t_params, int task_cnt) {
+void timerMux(te_param* te_params) {
     int i;
     timer_t ptimer;
     struct itimerspec intervaltimer;
-    te_param te_params;
 
     /* create message queue */
     if ((qidTimeEvents = msgQCreate (MAX_PENDING*2, Q_TE_MSG_SIZE, MSG_Q_PRIORITY)) == NULL)
@@ -198,17 +213,8 @@ void timerMux(t_param* t_params, int task_cnt) {
     if ( timer_create(CLOCK_REALTIME, NULL, &ptimer) == ERROR)
         printf("Error create_timer\n");
 
-    /* initialize timing event parameters */
-    te_params.t_params = t_params;
-    for (i=0; i<MAX_PENDING; i++) {
-        te_params.tp_params[i].is_set = (i < task_cnt) ? true : false;
-        te_params.tp_params[i].is_periodic = true;
-        te_params.tp_params[i].qt.tv_sec = 0;
-        te_params.tp_params[i].qt.tv_nsec = 1;
-    }
-
     /* connect timer to timer handler routine */
-    if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandler, (int)&te_params) == ERROR )
+    if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandler, (int)te_params) == ERROR )
         printf("Error connect_timer\n");
 
     /* set and arm timer */
@@ -252,7 +258,9 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
                     q_te_params.event_type, q_te_params.dl.tv_sec, q_te_params.dl.tv_nsec);
             }
             /* set new queue times */
-            (*te_params).tp_params[i].qt.tv_sec += (*te_params).t_params[i].period;
+			if ((*te_params).tp_params[i].is_periodic) {
+				(*te_params).tp_params[i].qt.tv_sec += (*te_params).t_params[i].period;
+			}
             (*te_params).tp_params[i].is_set = false;
             /* add arrive time event to the queue */ 
             q_te_params.event_type = ET_ARRIVE;
@@ -301,7 +309,7 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 
 
 /*************************************************************************/
-/*  schduler task                                                        */
+/*  scheduler task                                                       */
 /*                                                                       */
 /*************************************************************************/
 
@@ -420,6 +428,34 @@ void scheduler() {
         }
         taskSuspend(0);
     }
+}
+
+
+/*************************************************************************/
+/*  server task                                                          */
+/*                                                                       */
+/*************************************************************************/
+
+void server(te_param* te_params, float* utilisation) {
+	char cmd;
+	int exec_time;
+	while (1) {
+		cmd = '';
+		exec_time = 0;
+		while (cmd != 'n') {
+			scanf("%c", &cmd);
+		};
+		while ((t_params[i].exec_time < 1) || (t_params[i].exec_time > MAX_PERIOD)) {
+			printf("Enter the execution time of aperiodic task [1-%d]s: ", MAX_PERIOD);
+			scanf("%d", &exec_time);
+		};
+		
+		/* calculate the deadline */
+		dl.tv_sec = last_dl.tv_sec + exec_time/(*utilisation);
+		dl.tv_nsec = last_dl.tv_nsec + (exec_time*1000000)%(*utilisation);
+		
+		/* update te_params */
+	}
 }
 
 
