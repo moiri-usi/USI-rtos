@@ -80,7 +80,7 @@ MSG_Q_ID qidTimeEvents;
 
 /* function declarations */
 void timerMux(t_param*, int);
-void timerHandler(timer_t, te_param);
+void timerHandler(timer_t, te_param*);
 void scheduler();
 void periodic(int);
 void print_log_prefix(int);
@@ -154,7 +154,7 @@ int main(void) {
         t_params[i].id = taskCreate(t_name, 255, 0, STACK_SIZE,
             (FUNCPTR)periodic, t_params[i].exec_time, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 		print_log_prefix(LOG_DEBUG);
-		printf("main        | task_id: %d\n", t_params[i].id);
+		printf("main        | task created (id: %d)\n", t_params[i].id);
     }
 
     /* run for given simulation time */
@@ -185,8 +185,6 @@ void timerMux(t_param* t_params, int task_cnt) {
     /* create message queue */
     if ((qidTimeEvents = msgQCreate (MAX_PENDING*2, Q_TE_MSG_SIZE, MSG_Q_PRIORITY)) == NULL)
 		printf("Error msgQCreate\n");
-	else
-		printf("Queue for periodic producer created.\n");
 
 	/* create timer */
 	if ( timer_create(CLOCK_REALTIME, NULL, &ptimer) == ERROR)
@@ -195,14 +193,14 @@ void timerMux(t_param* t_params, int task_cnt) {
     /* initialize timing event parameters */
     te_params.t_params = t_params;
     for (i=0; i<MAX_PENDING; i++) {
-        te_params.tp_params[i].is_set = true;
+		te_params.tp_params[i].is_set = (i < task_cnt) ? true : false;
         te_params.tp_params[i].is_periodic = true;
         te_params.tp_params[i].qt.tv_sec = 0;
         te_params.tp_params[i].qt.tv_nsec = 1;
     }
 
 	/* connect timer to timer handler routine */
-	if ( timer_connect(ptimer, (VOIDFUNCPTR)scheduler, (int)&te_params) == ERROR )
+	if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandler, (int)&te_params) == ERROR )
 		printf("Error connect_timer\n");
 
 	/* set and arm timer */
@@ -224,52 +222,52 @@ void timerMux(t_param* t_params, int task_cnt) {
 /*                                                                       */
 /*************************************************************************/
 
-void timerHandler(timer_t callingtimer, te_param te_params) {
+void timerHandler(timer_t callingtimer, te_param* te_params) {
     int i, idx;
 	struct itimerspec intervaltimer;
     q_te_param q_te_params;
-
-	print_log_prefix(LOG_DEBUG);
-	printf("timer       | timer event occured");
 	
     for (i=0; i<MAX_PENDING; i++) {
-        if (te_params.tp_params[i].is_set) {
+        if ((*te_params).tp_params[i].is_set) {
             /* send time events */
-            if (te_params.tp_params[i].qt.tv_sec != 0) {
+            if ((*te_params).tp_params[i].qt.tv_sec != 0) {
                 /* add deadline time event to the queue */ 
                 q_te_params.event_type = ET_DEADLINE;
-                q_te_params.task_id = te_params.t_params[i].id;
-                q_te_params.dl = te_params.tp_params[i].qt;
+                q_te_params.task_id = (*te_params).t_params[i].id;
+                q_te_params.dl = (*te_params).tp_params[i].qt;
                 if (msgQSend (qidTimeEvents, (char*)&q_te_params, Q_TE_MSG_SIZE, NO_WAIT, MSG_PRI_NORMAL) == ERROR) {
                     print_log_prefix(LOG_ERROR);
-                    printf("timer       | cannot send queue msg (msgQSend)\n");
+                    printf("timer       | cannot send queue dl msg (msgQSend)\n");
                 }
 				print_log_prefix(LOG_DEBUG);
-				printf("timer       | dl time event sent");
+				printf("timer       | msgQSend: %d, %d, %d, %d\n", q_te_params.task_id,
+					q_te_params.event_type, q_te_params.dl.tv_sec, q_te_params.dl.tv_nsec);
             }
             /* set new queue times */
-            te_params.tp_params[i].qt.tv_sec += te_params.t_params[i].period;
-            te_params.tp_params[i].is_set = false;
+            (*te_params).tp_params[i].qt.tv_sec += (*te_params).t_params[i].period;
+            (*te_params).tp_params[i].is_set = false;
             /* add arrive time event to the queue */ 
             q_te_params.event_type = ET_ARRIVE;
-            q_te_params.task_id = te_params.t_params[i].id;
-            q_te_params.dl = te_params.tp_params[i].qt;
+            q_te_params.task_id = (*te_params).t_params[i].id;
+            q_te_params.dl = (*te_params).tp_params[i].qt;
             if (msgQSend (qidTimeEvents, (char*)&q_te_params, Q_TE_MSG_SIZE, NO_WAIT, MSG_PRI_NORMAL) == ERROR) {
                 print_log_prefix(LOG_ERROR);
-                printf("timer       | cannot send queue msg (msgQSend)\n");
+                printf("timer       | cannot send queue msg at (msgQSend)\n");
             }
 			print_log_prefix(LOG_DEBUG);
-			printf("timer       | at time event sent");
+			printf("timer       | msgQSend: %d, %d, %d, %d\n", q_te_params.task_id,
+				q_te_params.event_type, q_te_params.dl.tv_sec, q_te_params.dl.tv_nsec);
         }
     }
     /* activate scheduler */
     taskActivate(tidScheduler);
 
     /* get next queue time */
-	intervaltimer.it_value.tv_sec = te_params.tp_params[0].qt.tv_sec;
+	intervaltimer.it_value.tv_sec = (*te_params).tp_params[0].qt.tv_sec;
     for (i=1; i<MAX_PENDING; i++) {
-        if (intervaltimer.it_value.tv_sec > te_params.tp_params[i].qt.tv_sec) {
-            intervaltimer.it_value.tv_sec = te_params.tp_params[i].qt.tv_sec;
+        if (((*te_params).tp_params[i].qt.tv_sec != 0) &&
+			(intervaltimer.it_value.tv_sec > (*te_params).tp_params[i].qt.tv_sec)) {
+            intervaltimer.it_value.tv_sec = (*te_params).tp_params[i].qt.tv_sec;
         }
     }
 	
@@ -278,8 +276,8 @@ void timerHandler(timer_t callingtimer, te_param te_params) {
 
     /* mark tasks to be activated next*/
     for (i=0; i<MAX_PENDING; i++) {
-        if (intervaltimer.it_value.tv_sec == te_params.tp_params[i].qt.tv_sec) {
-            te_params.tp_params[i].is_set = true;
+        if (intervaltimer.it_value.tv_sec == (*te_params).tp_params[i].qt.tv_sec) {
+            (*te_params).tp_params[i].is_set = true;
         }
     }
 
@@ -315,6 +313,7 @@ void scheduler() {
                 printf("scheduler   | cannot receive queue msg (msgQReceive)");
             }
             id = q_te_params.task_id;
+/*
 			print_log_prefix(LOG_DEBUG);
 			printf("scheduler   | task_id: %d\n", id);
 			print_log_prefix(LOG_DEBUG);
@@ -323,6 +322,7 @@ void scheduler() {
 			printf("scheduler   | dl[s]: %d\n", (int)q_te_params.dl.tv_sec);
 			print_log_prefix(LOG_DEBUG);
 			printf("scheduler   | dl[ns]: %d\n", (int)q_te_params.dl.tv_nsec);
+*/
             if (q_te_params.event_type == ET_DEADLINE) {
                 /* check if deadline has been violated */
                 if(!taskIsSuspended(id)) {
@@ -335,22 +335,21 @@ void scheduler() {
                 empty_idx = -1;
                 for (j=0; j<MAX_READY; j++) {
                     if (tr_params[j].task_id == id) {
-                        tr_params[j].dl.tv_sec = q_te_params.dl.tv_sec;
-                        tr_params[j].dl.tv_nsec = q_te_params.dl.tv_nsec;
+                        tr_params[j].dl = q_te_params.dl;
                         id_exists = true;
                         break;
                     }
-                    else if ((tr_params[j].task_id == 0) && taskIdVerify(tr_params[j].task_id)) {
+                    else if ((tr_params[j].task_id == 0) || taskIdVerify(tr_params[j].task_id)) {
                         /* id does not exist or is zero */
                         tr_params[j].task_id = 0;
-                        empty_idx = i;
+                        empty_idx = j;
                     }
                 }
                 if (!id_exists) {
                     /* add new ready entry */
                     if (empty_idx == -1) {
                         print_log_prefix(LOG_ERROR);
-                        printf("scheduler   | task (%s) cannot be scheduled, to many active tasks", taskName(id));
+                        printf("scheduler   | task (%s) cannot be scheduled, to many active tasks\n", taskName(id));
                     }
                     else {
                         tr_params[empty_idx].task_id = id;
@@ -392,7 +391,9 @@ void scheduler() {
 				taskActivate(id);
 				print_log_prefix(LOG_INFO);
 				printf("scheduler   | task (%s|%d) activated\n", taskName(id), id);
+				tr_params[i].task_id = 0;
 				d_priority++;
+				
 			}
         }
         taskSuspend(0);
