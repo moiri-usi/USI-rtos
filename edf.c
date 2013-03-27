@@ -181,7 +181,7 @@ void scheduler(timer_t callingtimer, q_param pending_tasks) {
             printf("schedul | task (id:%d) activated\n", id);
             pending_tasks[i].status = RUNNING;
         }
-        else if (pending_tasks[i].status == RUNNING) {
+        else if (pending_tasks[i].status == RUNNING && !taskIsSuspended(id)) {
             /* restart the task (missed deadline) */
             print_log_prefix(LOG_WARNING);
             printf("schedul | task (id:%d) missed deadline\n", id);
@@ -189,6 +189,10 @@ void scheduler(timer_t callingtimer, q_param pending_tasks) {
                 print_log_prefix(LOG_ERROR);
                 printf("schedul | task (id:%d) cannot restart\n", id);
             }
+        }
+        else if (pending_tasks[i].status == RUNNING && taskIsSuspended(id)) {
+            /* task was executed in time */
+            pending_tasks[i].status = WAITING;
         }
         /* set the new queue time */
         pending_tasks[i].qt.tv_sec = pending_tasks[i].qt.tv_sec + period;
