@@ -92,6 +92,8 @@ void print_log_prefix(int);
 
 int main(void) {
     struct  timespec mytime;
+	float   utilisation = 0.0;
+	float   temp_util = 0.0;
     int     task_cnt = 0;
     int     nseconds = 0;
     int     i;
@@ -115,6 +117,7 @@ int main(void) {
 
     for (i = 0; i < task_cnt; i++){
         // get period of task i
+		temp_util = 0.0;
         while ((t_params[i].period < 1) || (t_params[i].period > MAX_PERIOD)) {
             printf("Enter the period of task %d [1-%d]s: ", i+1, MAX_PERIOD);
             scanf("%d", &t_params[i].period);
@@ -122,11 +125,17 @@ int main(void) {
         printf("Period of task %d set to %d.\n\n", i+1, t_params[i].period);
 
         // get execution time of task i
-        while ((t_params[i].exec_time < 1) || (t_params[i].exec_time > t_params[i].period)) {
+        while ((t_params[i].exec_time < 1) || (t_params[i].exec_time > t_params[i].period) || (temp_util >= 1.0)) {
+			if (temp_util >= 1.0) {
+				printf("Utilisation to high, enter lower execution time!\n");
+			}
             printf("Enter the execution time of task %d [1-%d]s: ", i+1, t_params[i].period);
             scanf("%d", &t_params[i].exec_time);
+			temp_util = utilisation + (float)t_params[i].exec_time/(float)t_params[i].period;
         };
-        printf("Execution time of task %d set to %d.\n\n", i+1, t_params[i].exec_time);
+		utilisation = temp_util;
+        printf("Execution time of task %d set to %d.\n", i+1, t_params[i].exec_time);
+		printf("Utilisation: %f\n\n", utilisation);
     }
 
     /* set clock to start at 0 */
