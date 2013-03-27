@@ -24,6 +24,7 @@
 #define MAX_APERIODIC 3
 #define MAX_PERIOD    100
 #define MAX_DEADLINE  100
+#define MAX_PRIO      100
 
 #define WAITING 0
 #define READY   1
@@ -39,13 +40,13 @@ typedef int bool;
 #define false 0
 
 typedef struct task_param {
-    int period = 0;
-    int exec_time = 0;
-    int id = 0;
+    int period;
+    int exec_time;
+    int id;
 } t_param;
 
 typedef struct queue_param {
-    struct itimerspec qt;
+    struct timespec qt;
     int period;
     int id;
     int status;
@@ -56,7 +57,7 @@ int tidTimerMux;
 
 /* function declarations */
 void timerMux(t_param*, int);
-void scheduler(timer_t);
+void scheduler(timer_t, q_param*);
 void periodic(int);
 void print_log_prefix(int);
 
@@ -111,7 +112,7 @@ int main(void) {
 
     /* create periodic tasks */
     for (i=0; i<task_cnt; i++) {
-        t_params[i].id = taskSpawn("tPeriodic_" + (char)i, 10, 0, STACK_SIZE,
+        t_params[i].id = taskCreate("tPeriodic_" + (char)i, 10, 0, STACK_SIZE,
             (FUNCPTR)periodic, t_params[i].exec_time, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
@@ -151,6 +152,8 @@ void timerMux(t_param* t_params, int task_cnt) {
 	/* set and arm timer */
 	intervaltimer.it_value.tv_sec = 0;
 	intervaltimer.it_value.tv_nsec = 1;
+	intervaltimer.it_interval.tv_sec = 0;
+	intervaltimer.it_interval.tv_nsec = 0;
 
 	if ( timer_settime(ptimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR )
 		printf("Error set_timer\n");
@@ -165,7 +168,7 @@ void timerMux(t_param* t_params, int task_cnt) {
 /*                                                                       */
 /*************************************************************************/
 
-void scheduler(timer_t callingtimer, q_param pending_tasks) {
+void scheduler(timer_t callingtimer, q_param* pending_tasks) {
     int i, j, id, period;
 	struct itimerspec intervaltimer;
 
@@ -233,7 +236,7 @@ void periodic(int exec_time) {
         taskDelay(exec_time);
         print_log_prefix(LOG_INFO);
         printf("t_%d | execution finished\n", taskIdSelf());
-        taskSuspend();
+        taskSuspend(0);
     }
 }
 
@@ -245,6 +248,7 @@ void periodic(int exec_time) {
 
 void print_log_prefix(int type) {
     const char* str_type;
+	struct timespec mytime;
     if (type == LOG_ERROR) {
         str_type = "error  ";
     }
