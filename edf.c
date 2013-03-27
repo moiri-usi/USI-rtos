@@ -25,7 +25,7 @@
 #define MAX_APERIODIC 3
 #define MAX_PERIOD    100
 #define MAX_DEADLINE  100
-#define MAX_PRIO      100
+#define MAX_PRIO      102
 
 #define WAITING 0
 #define READY   1
@@ -35,6 +35,7 @@
 #define LOG_INFO    0
 #define LOG_WARNING 1
 #define LOG_ERROR   2
+#define LOG_DEBUG   3
 
 typedef int bool;
 #define true  1
@@ -74,6 +75,7 @@ int main(void) {
     int     nseconds = 0;
     int     i;
     t_param t_params[MAX_PERIODIC];
+	char t_name[20];
 
     /* get the simulation time */ 
     printf("\n\n");
@@ -93,14 +95,14 @@ int main(void) {
     for (i = 0; i < task_cnt; i++){
         // get period of task i
         while ((t_params[i].period < 1) || (t_params[i].period > MAX_PERIOD)) {
-            printf("Enter the period of task %d [1-%d]: ", i+1, MAX_PERIOD);
+            printf("Enter the period of task %d [1-%d]s: ", i+1, MAX_PERIOD);
             scanf("%d", &t_params[i].period);
         };
         printf("Period of task %d set to %d.\n\n", i+1, t_params[i].period);
 
         // get execution time of task i
         while ((t_params[i].exec_time < 1) || (t_params[i].exec_time > t_params[i].period)) {
-            printf("Enter the execution time of task %d [1-%d]: ", i+1, t_params[i].period);
+            printf("Enter the execution time of task %d [1-%d]s: ", i+1, t_params[i].period);
             scanf("%d", &t_params[i].exec_time);
         };
         printf("Execution time of task %d set to %d.\n\n", i+1, t_params[i].exec_time);
@@ -117,12 +119,13 @@ int main(void) {
                 (int) mytime.tv_sec, (int)mytime.tv_nsec);
 
     /* spawn (create and start) timer task */
-    tidTimerMux = taskSpawn("tTimerMux", 10, 0, STACK_SIZE,
+    tidTimerMux = taskSpawn("tTimerMux", 101, 0, STACK_SIZE,
         (FUNCPTR)timerMux, (int)t_params, task_cnt, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /* create periodic tasks */
     for (i=0; i<task_cnt; i++) {
-        t_params[i].id = taskCreate("tPeriodic_" + (char)i, 10, 0, STACK_SIZE,
+		sprintf(t_name, "tPeriodic_%d", i);
+        t_params[i].id = taskCreate(t_name, 255, 0, STACK_SIZE,
             (FUNCPTR)periodic, t_params[i].exec_time, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
@@ -200,33 +203,41 @@ void scheduler(timer_t callingtimer, q_param* pending_tasks) {
             /* activate the task */
             taskActivate(id);
             print_log_prefix(LOG_INFO);
-            printf("schedul | task (id:%d) activated\n", id);
+            printf("scheduler   | task (%s) activated\n", taskName(id));
             pending_tasks[i].status = RUNNING;
+			/* set the new queue time */
+			pending_tasks[i].qt.tv_sec = pending_tasks[i].qt.tv_sec + period;
         }
         else if (pending_tasks[i].status == RUNNING && !taskIsSuspended(id)) {
             /* restart the task (missed deadline) */
             print_log_prefix(LOG_WARNING);
-            printf("schedul | task (id:%d) missed deadline\n", id);
+            printf("scheduler   | task (%s) missed deadline\n", taskName(id));
             if (taskRestart(id) == ERROR) {
                 print_log_prefix(LOG_ERROR);
-                printf("schedul | task (id:%d) cannot restart\n", id);
+                printf("scheduler   | task (%s) cannot restart\n", taskName(id));
             }
+			/* set the new queue time */
+			pending_tasks[i].qt.tv_sec = pending_tasks[i].qt.tv_sec + period;
         }
         else if (pending_tasks[i].status == RUNNING && taskIsSuspended(id)) {
             /* task was executed in time */
             pending_tasks[i].status = WAITING;
+			print_log_prefix(LOG_DEBUG);
+			printf("scheduler   | task (%s) executed in time\n", taskName(id));
         }
-        /* set the new queue time */
-        pending_tasks[i].qt.tv_sec = pending_tasks[i].qt.tv_sec + period;
     }
 
     /* get next queue time */
 	intervaltimer.it_value.tv_sec = pending_tasks[0].qt.tv_sec;
     for (i=1; i<MAX_PERIODIC; i++) {
-        if (intervaltimer.it_value.tv_sec < pending_tasks[i].qt.tv_sec) {
+        if ((intervaltimer.it_value.tv_sec > pending_tasks[i].qt.tv_sec)
+				&& (pending_tasks[i].qt.tv_sec != 0)) {
             intervaltimer.it_value.tv_sec = pending_tasks[i].qt.tv_sec;
         }
     }
+	
+	print_log_prefix(LOG_DEBUG);
+	printf("scheduler   | timer set to %ds\n", intervaltimer.it_value.tv_sec);
 
     /* mark tasks to be activated next*/
     for (i=0; i<MAX_PERIODIC; i++) {
@@ -236,9 +247,12 @@ void scheduler(timer_t callingtimer, q_param* pending_tasks) {
     }
 
 	/* set and arm timer */
+	intervaltimer.it_value.tv_nsec = 0;
+	intervaltimer.it_interval.tv_sec = 0;
+	intervaltimer.it_interval.tv_nsec = 0;
 	if (timer_settime(callingtimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR ) {
         print_log_prefix(LOG_ERROR);
-        printf("schedul | set_timer\n");
+        printf("scheduler   | set_timer\n");
     }
 }
 
@@ -251,10 +265,10 @@ void scheduler(timer_t callingtimer, q_param* pending_tasks) {
 void periodic(int exec_time) {
     while(1) {
         print_log_prefix(LOG_INFO);
-        printf("t_%d | execution started\n", taskIdSelf());
-        taskDelay(exec_time);
+        printf("%s | execution started\n", taskName(taskIdSelf()));
+        taskDelay(exec_time*60);
         print_log_prefix(LOG_INFO);
-        printf("t_%d | execution finished\n", taskIdSelf());
+        printf("%s | execution finished\n", taskName(taskIdSelf()));
         taskSuspend(0);
     }
 }
@@ -277,12 +291,15 @@ void print_log_prefix(int type) {
     else if (type == LOG_INFO) {
         str_type = "info   ";
     }
+	else if (type == LOG_DEBUG) {
+		str_type = "debug  ";
+	}
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) {
-        printf("---s | error   |         | clock_gettime\n", taskIdSelf());
-        printf("---s | %s | ", str_type);
+        printf("----s | error   |              | clock_gettime\n", taskIdSelf());
+        printf("----s | %s | ", str_type);
     }
     else {
-        printf("%03ds | %s | ", (int)mytime.tv_sec, str_type);
+        printf("%04ds | %s | ", (int)mytime.tv_sec, str_type);
     }
 }
