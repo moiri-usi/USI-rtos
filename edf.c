@@ -28,14 +28,13 @@
 #define MAX_PERIOD    100
 #define MAX_DEADLINE  100
 #define MAX_PRIO      103
-
-#define WAITING 0
-#define READY   1
-#define RUNNING 2
-#define DONE    3
+#define MIN_PRIO      255
 
 #define ET_ARRIVE   0
 #define ET_DEADLINE 1
+
+#define ST_RUN      0
+#define ST_SUSPEND  1
 
 #define Q_TE_MSG_SIZE sizeof(q_te_param)
 
@@ -158,7 +157,7 @@ int main(void) {
     }
 
     /* run for given simulation time */
-    taskDelay(nseconds*60);
+    taskDelay(nseconds*sysClkRateGet());
 
     /* create periodic tasks */
     for (i=0; i<task_cnt; i++) {
@@ -298,9 +297,9 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 /*************************************************************************/
 
 void scheduler() {
-    int i, j, id, d_priority, empty_idx;
+    int i, j, id, d_priority, new_priority, old_priority, empty_idx;
     bool id_exists;
-    struct timespec temp_dl;
+	q_te_param tr_param_temp;
     q_te_param q_te_params;
     q_te_param tr_params[MAX_READY];
 
@@ -336,12 +335,13 @@ void scheduler() {
                 for (j=0; j<MAX_READY; j++) {
                     if (tr_params[j].task_id == id) {
                         tr_params[j].dl = q_te_params.dl;
+						tr_params[j].event_type = ST_SUSPEND;
                         id_exists = true;
                         break;
                     }
                     else if ((tr_params[j].task_id == 0) || taskIdVerify(tr_params[j].task_id)) {
                         /* id does not exist or is zero */
-                        tr_params[j].task_id = 0;
+                        tr_params[j].task_id = -1;
                         empty_idx = j;
                     }
                 }
@@ -354,6 +354,7 @@ void scheduler() {
                     else {
                         tr_params[empty_idx].task_id = id;
                         tr_params[empty_idx].dl = q_te_params.dl;
+						tr_params[empty_idx].event_type = ST_SUSPEND;
                     }
                 }
             }
@@ -375,9 +376,9 @@ void scheduler() {
                         )
                    )
                 {
-                    temp_dl = tr_params[i].dl;
-                    tr_params[i].dl = tr_params[j].dl;
-                    tr_params[j].dl = temp_dl;
+					tr_param_temp = tr_params[i];
+                    tr_params[i] = tr_params[j];
+                    tr_params[j] = tr_param_temp;
                 }
             }
         }
@@ -387,13 +388,25 @@ void scheduler() {
         for (i=0; i<MAX_READY; i++) {
             id = tr_params[i].task_id;
             if (id > 0) {
-                taskPrioritySet(id, MAX_PRIO + d_priority);
-                taskActivate(id);
-                print_log_prefix(LOG_INFO);
-                printf("scheduler   | task (%s|%d) activated\n", taskName(id), id);
-                tr_params[i].task_id = 0;
+				taskPriorityGet(id, &old_priority);
+				new_priority = MAX_PRIO + d_priority;
+				if (new_priority >= MIN_PRIO) {
+					new_priority = MIN_PRIO;
+					print_log_prefix(LOG_WARNING);
+					printf("scheduler   | min priority reached\n", taskName(id), id);
+				}
+				if (old_priority != new_priority) {
+					taskPrioritySet(id, new_priority);
+					print_log_prefix(LOG_DEBUG);
+					printf("scheduler   | priority of task (%s|%d) set to %d\n", taskName(id), id, new_priority);
+				}
+				if (tr_params[i].event_type == ST_SUSPEND) {
+					taskActivate(id);
+					print_log_prefix(LOG_INFO);
+					printf("scheduler   | task (%s|%d) activated\n", taskName(id), id);
+					tr_params[i].event_type = ST_RUN;
+				}
                 d_priority++;
-                
             }
         }
         taskSuspend(0);
@@ -411,12 +424,13 @@ void periodic(int exec_time) {
     while(1) {
         print_log_prefix(LOG_INFO);
         printf("%s | execution started\n", taskName(taskIdSelf()));
-        tick_temp = 0;
         cnt = 0;
-        while (cnt < exec_time*60) {
-            if (tick_temp != tickGet())
-                cnt += tickGet() - tick_temp;
-                tick_temp = tickGet();
+		tick_temp = tickGet();
+        while (cnt < exec_time*sysClkRateGet()) {
+            if (tick_temp != tickGet()) {
+				tick_temp = tickGet();
+                cnt++;
+            }
         }
         print_log_prefix(LOG_INFO);
         printf("%s | execution finished\n", taskName(taskIdSelf()));
@@ -447,10 +461,10 @@ void print_log_prefix(int type) {
     }
 
     if ( clock_gettime (CLOCK_REALTIME, &mytime) == ERROR) {
-        printf("----s | error   |              | clock_gettime\n", taskIdSelf());
-        printf("----s | %s | ", str_type);
+        printf("----s ---ms | error   |              | clock_gettime\n", taskIdSelf());
+        printf("----s ---ms | %s | ", str_type);
     }
     else {
-        printf("%04ds | %s | ", (int)mytime.tv_sec, str_type);
+        printf("%04ds %03dms | %s | ", (int)mytime.tv_sec, (int)(mytime.tv_nsec/1000000), str_type);
     }
 }
