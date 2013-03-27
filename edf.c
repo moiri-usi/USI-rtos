@@ -20,6 +20,7 @@
 
 /* defines */
 #define STACK_SIZE    20000
+#define MAX_SECONDS   1000
 #define MAX_PERIODIC  3
 #define MAX_APERIODIC 3
 #define MAX_PERIOD    100
@@ -70,8 +71,17 @@ void print_log_prefix(int);
 int main(void) {
     struct  timespec mytime;
     int     task_cnt = 0;
+    int     nseconds = 0;
     int     i;
     t_param t_params[MAX_PERIODIC];
+
+    /* get the simulation time */ 
+    printf("\n\n");
+    while ((nseconds < 1) || (nseconds > MAX_SECONDS)) {
+        printf("Enter overall simulation time [1-%d s]: ", MAX_SECONDS);
+        scanf("%d", &nseconds);
+    };
+    printf("Simulating for %d seconds.\n\n", nseconds);
 
     /* get the number of tasks */
     while ((task_cnt < 1) || (task_cnt > MAX_PERIODIC)) {
@@ -115,6 +125,15 @@ int main(void) {
         t_params[i].id = taskCreate("tPeriodic_" + (char)i, 10, 0, STACK_SIZE,
             (FUNCPTR)periodic, t_params[i].exec_time, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
+
+    /* run for given simulation time */
+    taskDelay(nseconds*60);
+
+    /* create periodic tasks */
+    for (i=0; i<task_cnt; i++) {
+        taskDelete(t_params[i].id);
+    }
+    taskDelete(tidTimerMux);
 
     printf("Exiting. \n\n");
     return(0);
