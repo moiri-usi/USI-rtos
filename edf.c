@@ -113,7 +113,7 @@ void server(te_param*, float*, timer_t*, float*);
 void scheduler(tr_param*, float*);
 void user_task(int);
 void print_log(int, char*);
-void send2q(int, int, int, struct timespec);
+void send2q(int, int, int, struct timespec, float);
 void set_new_timer(te_param*, timer_t*);
 
 char log_msg[255];
@@ -297,14 +297,14 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
             if ((*te_params).tpp_params[i].qt.tv_sec != 0) {
                 /* add deadline time event to the queue */
                 send2q((*te_params).t_params[i].id, TT_PERIODIC, ET_DEADLINE,
-                        (*te_params).tpp_params[i].qt);
+                        (*te_params).tpp_params[i].qt, 0.0);
             }
             /* set new queue times */
             (*te_params).tpp_params[i].qt.tv_sec += (*te_params).t_params[i].period;
             (*te_params).tpp_params[i].q_state = QS_WAITING4Q;
             /* add arrive time event to the queue */ 
             send2q((*te_params).t_params[i].id, TT_PERIODIC, ET_ARRIVE,
-                    (*te_params).tpp_params[i].qt);
+                    (*te_params).tpp_params[i].qt, 0.0);
         }
     }
 
@@ -314,7 +314,7 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
             /* send time events */
             /* add deadline time event to the queue */ 
             send2q((*te_params).tpa_params[i].id, TT_APERIODIC, ET_DEADLINE,
-                    (*te_params).tpa_params[i].qt);
+                    (*te_params).tpa_params[i].qt, 0.0);
             (*te_params).tpa_params[i].q_state = QS_QUEUED;
         }
     }
@@ -384,6 +384,7 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer,
                 last_dl = (*te_params).last_aperiodic_task.qt;
             }
 
+
             /* calculate the deadline */
 			util_sec = (float)exec_time/(*utilisation_server);
             dl.tv_sec = last_dl.tv_sec + util_sec;
@@ -393,8 +394,14 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer,
 				dl.tv_sec += 1;
 			}
 			
+			temp_util_server = (float)exec_time/((float)dl.tv_sec + (float)dl.tv_nsec/1000000000);
+			
 			/* update utilisation of server */
 			*utilisation_server -= temp_util_server;
+			sprintf(log_msg, "task utilisation: %f", temp_util_server);
+			print_log(LOG_DEBUG, log_msg);
+			sprintf(log_msg, "server bandwith: %f", *utilisation_server);
+			print_log(LOG_DEBUG, log_msg);
 			
 			/* create task */
 			sprintf(t_name, "tAperiodic_%d", (*te_params).cnt_aperiodic);
@@ -409,7 +416,7 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer,
 			print_log(LOG_INFO, log_msg);
 
 			/* aperiodic task arrived, queue time event */
-			send2q(id, TT_APERIODIC, ET_ARRIVE, dl);
+			send2q(id, TT_APERIODIC, ET_ARRIVE, dl, temp_util_server);
 
 			/* update te_params */
 			(*te_params).tpa_params[i].id = id;
@@ -477,6 +484,8 @@ void scheduler(tr_param* tr_params, float* utilisation_server) {
 					for (j=0; j<MAX_READY; j++) {
 						if (tr_params[j].id == id) {
 							*utilisation_server += tr_params[j].utilisation;
+							sprintf(log_msg, "server bandwith: %f", *utilisation_server);
+							print_log(LOG_INFO, log_msg);
 							break;
 						}
 					}
@@ -650,11 +659,12 @@ void print_log(int type, char* msg) {
 /*                                                                       */
 /*************************************************************************/
 
-void send2q(int id, int task_type, int event_type, struct timespec qt) {
+void send2q(int id, int task_type, int event_type, struct timespec qt, float utilisation) {
     q_te_param q_te_params;
     q_te_params.task_id = id;
     q_te_params.task_type = task_type;
     q_te_params.event_type = event_type;
+	q_te_params.utilisation = utilisation;
     q_te_params.dl = qt;
     if (msgQSend (qidTimeEvents, (char*)&q_te_params, Q_TE_MSG_SIZE, NO_WAIT, MSG_PRI_NORMAL) == ERROR) {
 		sprintf(log_msg, "cannot send queue dl msg (msgQSend)");
