@@ -320,7 +320,8 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 void server(te_param* te_params, float* utilisation, timer_t* ptimer) {
 	char cmd;
     char t_name[20];
-	int exec_time, id, empty_idx, i, util_sec;
+	int exec_time, id, empty_idx, i;
+	float util_sec;
     struct timespec now, last_dl, dl;
 	while (1) {
 		cmd = '0';
@@ -374,9 +375,9 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer) {
             }
 
             /* calculate the deadline */
-			util_sec = (int)((float)exec_time/(1.0-(*utilisation)));
+			util_sec = (float)exec_time/(1.0-(*utilisation));
             dl.tv_sec = last_dl.tv_sec + util_sec;
-            dl.tv_nsec = last_dl.tv_nsec + (int)((exec_time/(*utilisation) - (float)util_sec)*1000000000);
+            dl.tv_nsec = last_dl.tv_nsec + (int)((util_sec - (float)((int)util_sec))*1000000000);
 			print_log_prefix(LOG_DEBUG);
 			printf("server      | dl of task (%s|%d) set to %ds %dms\n", t_name, id, dl.tv_sec, dl.tv_nsec/1000000);
 
@@ -520,7 +521,7 @@ void scheduler() {
 			printf("scheduler   | ready task set (ordered): %d, %d, %d, %d\n", tr_params[i].id,
 				tr_params[i].is_scheduled, tr_params[i].dl.tv_sec, tr_params[i].dl.tv_nsec);
 				*/
-            if ((id > 0) && !taskIdVerify(tr_params[j].id)) {
+            if ((id > 0) && taskIdVerify(tr_params[j].id)) {
 				taskPriorityGet(id, &old_priority);
 				new_priority = MAX_PRIO + d_priority;
 				if (new_priority >= MIN_PRIO) {
@@ -634,6 +635,7 @@ void set_new_timer(te_param* te_params, timer_t* ptimer) {
     struct itimerspec intervaltimer;
     /* get next queue time */
     intervaltimer.it_value.tv_sec = (*te_params).tpp_params[0].qt.tv_sec;
+	intervaltimer.it_value.tv_nsec = (*te_params).tpp_params[0].qt.tv_nsec;
     for (i=1; i<MAX_PERIODIC; i++) {
         if (((*te_params).tpp_params[i].qt.tv_sec != 0) &&
             ((intervaltimer.it_value.tv_sec > (*te_params).tpp_params[i].qt.tv_sec) ||
@@ -668,7 +670,7 @@ void set_new_timer(te_param* te_params, timer_t* ptimer) {
     
     print_log_prefix(LOG_DEBUG);
     printf("timer       | timer set to %ds, %dms\n", intervaltimer.it_value.tv_sec,
-            intervaltimer.it_value.tv_nsec);
+            intervaltimer.it_value.tv_nsec/1000000);
 
     /* mark tasks to be activated next */
     for (i=0; i<MAX_PERIODIC; i++) {
