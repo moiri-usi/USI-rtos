@@ -27,7 +27,7 @@
 #define MAX_PERIOD    100
 #define MAX_DEADLINE  100
 #define MAX_PRIO      104
-#define MIN_PRIO      255
+#define MIN_PRIO      254
 
 #define ET_ARRIVE     0
 #define ET_DEADLINE   1
@@ -362,11 +362,12 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer,
 			print_log(LOG_WARNING, log_msg);
         }
         else {
+			//taskPrioritySet(taskIdSelf(), 255);
             while ((exec_time < 1) || (exec_time > MAX_PERIOD)) {
                 printf("Enter the execution time of aperiodic task [1-%d]s: ", MAX_PERIOD);
                 scanf("%d", &exec_time);
             };
-
+			//taskPrioritySet(taskIdSelf(), 102);
             if ( clock_gettime (CLOCK_REALTIME, &now) == ERROR) {
 				printf("----s ---ms |   error |       server | clock_gettime\n");
             }
