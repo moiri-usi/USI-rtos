@@ -98,11 +98,12 @@ MSG_Q_ID qidTimeEvents;
 /* function declarations */
 void timerMux(te_param*);
 void timerHandler(timer_t, te_param*);
-void server(te_param*, float*);
+void server(te_param*, float*, timer_t*);
 void scheduler();
 void user_task(int);
 void print_log_prefix(int);
 void send2q(int, int, int, struct timespec);
+void set_new_timer(te_param*, timer_t*);
 
 
 /*************************************************************************/
@@ -119,6 +120,7 @@ int main(void) {
     int     i;
     t_param t_params[MAX_PERIODIC];
 	te_param te_params;
+    timer_t ptimer;
     char t_name[20];
 
     /* get the simulation time */ 
@@ -190,11 +192,11 @@ int main(void) {
 
     /* spawn (create and start) timer task */
     tidTimerMux = taskSpawn("tTimerMux", 101, 0, STACK_SIZE,
-        (FUNCPTR)timerMux, (int)&te_params, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        (FUNCPTR)timerMux, (int)&te_params, (int)&ptimer, 0, 0, 0, 0, 0, 0, 0, 0);
 		
 	/* spawn (create and start) server task */
 	tidServer = taskSpawn("tServer", 102, 0, STACK_SIZE,
-		(FUNCPTR)server, (int)&te_params, (int)&utilisation, 0, 0, 0, 0, 0, 0, 0, 0);
+		(FUNCPTR)server, (int)&te_params, (int)&utilisation, (int)&ptimer, 0, 0, 0, 0, 0, 0, 0);
 
     /* create scheduler task */
     tidScheduler = taskCreate("tScheduler", 103, 0, STACK_SIZE,
@@ -230,9 +232,8 @@ int main(void) {
 /*                                                                            */
 /**********************************************************************i*******/
 
-void timerMux(te_param* te_params) {
+void timerMux(te_param* te_params, timer_t* ptimer) {
     int i;
-    timer_t ptimer;
     struct itimerspec intervaltimer;
 
     /* create message queue */
@@ -240,11 +241,11 @@ void timerMux(te_param* te_params) {
         printf("Error msgQCreate\n");
 
     /* create timer */
-    if ( timer_create(CLOCK_REALTIME, NULL, &ptimer) == ERROR)
+    if ( timer_create(CLOCK_REALTIME, NULL, ptimer) == ERROR)
         printf("Error create_timer\n");
 
     /* connect timer to timer handler routine */
-    if ( timer_connect(ptimer, (VOIDFUNCPTR)timerHandler, (int)te_params) == ERROR )
+    if ( timer_connect(*ptimer, (VOIDFUNCPTR)timerHandler, (int)te_params) == ERROR )
         printf("Error connect_timer\n");
 
     /* set and arm timer */
@@ -253,7 +254,7 @@ void timerMux(te_param* te_params) {
     intervaltimer.it_interval.tv_sec = 0;
     intervaltimer.it_interval.tv_nsec = 0;
 
-    if ( timer_settime(ptimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR )
+    if ( timer_settime(*ptimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR )
         printf("Error set_timer\n");
 
     /* idle loop */
@@ -267,8 +268,7 @@ void timerMux(te_param* te_params) {
 /*************************************************************************/
 
 void timerHandler(timer_t callingtimer, te_param* te_params) {
-    int i, idx;
-    struct itimerspec intervaltimer;
+    int i;
     q_te_param q_te_params;
 
     /* convert periodic tasks to tome events */
@@ -303,44 +303,8 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
     /* activate scheduler */
     taskActivate(tidScheduler);
 
-    /* get next queue time */
-    intervaltimer.it_value.tv_sec = (*te_params).tpp_params[0].qt.tv_sec;
-    for (i=1; i<MAX_PERIODIC; i++) {
-        if (((*te_params).tpp_params[i].qt.tv_sec != 0) &&
-            (intervaltimer.it_value.tv_sec > (*te_params).tpp_params[i].qt.tv_sec)) {
-            intervaltimer.it_value.tv_sec = (*te_params).tpp_params[i].qt.tv_sec;
-        }
-    }
-    for (i=0; i<MAX_APERIODIC; i++) {
-        if (((*te_params).tpa_params[i].qt.tv_sec != 0) &&
-            (intervaltimer.it_value.tv_sec > (*te_params).tpa_params[i].qt.tv_sec)) {
-            intervaltimer.it_value.tv_sec = (*te_params).tpa_params[i].qt.tv_sec;
-        }
-    }
-    
-    print_log_prefix(LOG_DEBUG);
-    printf("timer       | timer set to %ds\n", intervaltimer.it_value.tv_sec);
-
-    /* mark tasks to be activated next */
-    for (i=0; i<MAX_PERIODIC; i++) {
-        if (intervaltimer.it_value.tv_sec == (*te_params).tpp_params[i].qt.tv_sec) {
-            (*te_params).tpp_params[i].is_ready2q = true;
-        }
-    }
-    for (i=0; i<MAX_APERIODIC; i++) {
-        if (intervaltimer.it_value.tv_sec == (*te_params).tpa_params[i].qt.tv_sec) {
-            (*te_params).tpa_params[i].is_ready2q = true;
-        }
-    }
-
-    /* set and arm timer */
-    intervaltimer.it_value.tv_nsec = 0;
-    intervaltimer.it_interval.tv_sec = 0;
-    intervaltimer.it_interval.tv_nsec = 0;
-    if (timer_settime(callingtimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR ) {
-        print_log_prefix(LOG_ERROR);
-        printf("timer       | set_timer\n");
-    }
+    /* set next timer event */
+    set_new_timer(te_params, &callingtimer);
 }
 
 
@@ -349,7 +313,7 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 /*                                                                       */
 /*************************************************************************/
 
-void server(te_param* te_params, float* utilisation) {
+void server(te_param* te_params, float* utilisation, timer_t* ptimer) {
 	char cmd;
     char t_name[20];
 	int exec_time, id, empty_idx, i, util_sec;
@@ -419,6 +383,9 @@ void server(te_param* te_params, float* utilisation) {
             (*te_params).tpa_params[i].id = id;
             (*te_params).tpa_params[i].qt = dl;
             (*te_params).tpa_params[i].is_ready2q = false;
+
+            /* set next timer event */
+            set_new_timer(te_params, ptimer);
 			
 			/* activate scheduler */
 			taskActivate(tidScheduler);
@@ -650,4 +617,54 @@ void send2q(int id, int task_type, int event_type, struct timespec qt) {
     print_log_prefix(LOG_DEBUG);
     printf("timer       | msgQSend: %d, %d, %d, %d\n", q_te_params.task_id,
             q_te_params.event_type, q_te_params.dl.tv_sec, q_te_params.dl.tv_nsec);
+}
+
+
+/*************************************************************************/
+/*  set new timer for timerHandler                                       */
+/*                                                                       */
+/*************************************************************************/
+
+void set_new_timer(te_param* te_params, timer_t* ptimer) {
+    int i;
+    struct itimerspec intervaltimer;
+    /* get next queue time */
+    intervaltimer.it_value.tv_sec = (*te_params).tpp_params[0].qt.tv_sec;
+    for (i=1; i<MAX_PERIODIC; i++) {
+        if (((*te_params).tpp_params[i].qt.tv_sec != 0) &&
+            (intervaltimer.it_value.tv_sec > (*te_params).tpp_params[i].qt.tv_sec)) {
+            intervaltimer.it_value.tv_sec = (*te_params).tpp_params[i].qt.tv_sec;
+        }
+    }
+    for (i=0; i<MAX_APERIODIC; i++) {
+        if (((*te_params).tpa_params[i].qt.tv_sec != 0) &&
+            (intervaltimer.it_value.tv_sec > (*te_params).tpa_params[i].qt.tv_sec)) {
+            intervaltimer.it_value.tv_sec = (*te_params).tpa_params[i].qt.tv_sec;
+        }
+    }
+    
+    print_log_prefix(LOG_DEBUG);
+    printf("timer       | timer set to %ds\n", intervaltimer.it_value.tv_sec);
+
+    /* mark tasks to be activated next */
+    for (i=0; i<MAX_PERIODIC; i++) {
+        if (intervaltimer.it_value.tv_sec == (*te_params).tpp_params[i].qt.tv_sec) {
+            (*te_params).tpp_params[i].is_ready2q = true;
+        }
+    }
+    for (i=0; i<MAX_APERIODIC; i++) {
+        if (intervaltimer.it_value.tv_sec == (*te_params).tpa_params[i].qt.tv_sec) {
+            (*te_params).tpa_params[i].is_ready2q = true;
+        }
+    }
+
+    /* set and arm timer */
+    intervaltimer.it_value.tv_nsec = 0;
+    intervaltimer.it_interval.tv_sec = 0;
+    intervaltimer.it_interval.tv_nsec = 0;
+    if (timer_settime(*ptimer, TIMER_ABSTIME, &intervaltimer, NULL) == ERROR ) {
+        print_log_prefix(LOG_ERROR);
+        printf("timer       | set_timer\n");
+    }
+
 }
