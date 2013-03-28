@@ -35,6 +35,10 @@
 #define TT_PERIODIC   0
 #define TT_APERIODIC  1
 
+#define QS_WAITING4Q  0
+#define QS_READY2Q    1
+#define QS_QUEUED     2
+
 #define Q_TE_MSG_SIZE sizeof(q_te_param)
 
 #define LOG_INFO      0
@@ -56,7 +60,7 @@ typedef struct task_param {
 /* parameters of pending tasks (to be 
  * converted in timie events)*/
 typedef struct task_pending_param {
-    bool is_ready2q;
+	int q_state;
     int id;
     struct timespec qt;
 } tp_param;
@@ -96,7 +100,7 @@ int tidServer;
 MSG_Q_ID qidTimeEvents;
 
 /* function declarations */
-void timerMux(te_param*);
+void timerMux(te_param*, timer_t*);
 void timerHandler(timer_t, te_param*);
 void server(te_param*, float*, timer_t*);
 void scheduler();
@@ -170,16 +174,16 @@ int main(void) {
 	te_params.t_params = t_params;
 	te_params.cnt_aperiodic = 0;
 	te_params.last_aperiodic_task.id = 0;
-	te_params.last_aperiodic_task.is_ready2q = false;
+	te_params.last_aperiodic_task.q_state = QS_WAITING4Q;
 	te_params.last_aperiodic_task.qt.tv_sec = 0;
 	te_params.last_aperiodic_task.qt.tv_nsec = 0;
 	for (i=0; i<MAX_PERIODIC; i++) {
-		te_params.tpp_params[i].is_ready2q = (i < task_cnt) ? true : false;
+		te_params.tpp_params[i].q_state = (i < task_cnt) ? QS_READY2Q : QS_WAITING4Q;
 		te_params.tpp_params[i].qt.tv_sec = 0;
 		te_params.tpp_params[i].qt.tv_nsec = 0;
 	}
 	for (i=0; i<MAX_APERIODIC; i++) {
-		te_params.tpa_params[i].is_ready2q = false;
+		te_params.tpa_params[i].q_state = QS_WAITING4Q;
 		te_params.tpa_params[i].qt.tv_sec = 0;
 		te_params.tpa_params[i].qt.tv_nsec = 0;
 	}
@@ -273,7 +277,7 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 
     /* convert periodic tasks to tome events */
     for (i=0; i<MAX_PERIODIC; i++) {
-        if ((*te_params).tpp_params[i].is_ready2q) {
+        if ((*te_params).tpp_params[i].q_state == QS_READY2Q) {
             /* send time events */
             if ((*te_params).tpp_params[i].qt.tv_sec != 0) {
                 /* add deadline time event to the queue */
@@ -282,7 +286,7 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
             }
             /* set new queue times */
             (*te_params).tpp_params[i].qt.tv_sec += (*te_params).t_params[i].period;
-            (*te_params).tpp_params[i].is_ready2q = false;
+            (*te_params).tpp_params[i].q_state = QS_WAITING4Q;
             /* add arrive time event to the queue */ 
             send2q((*te_params).t_params[i].id, TT_PERIODIC, ET_ARRIVE,
                     (*te_params).tpp_params[i].qt);
@@ -291,12 +295,12 @@ void timerHandler(timer_t callingtimer, te_param* te_params) {
 
     /* convert aperiodic tasks to tome events */
     for (i=0; i<MAX_APERIODIC; i++) {
-        if ((*te_params).tpa_params[i].is_ready2q) {
+        if ((*te_params).tpa_params[i].q_state == QS_READY2Q) {
             /* send time events */
             /* add deadline time event to the queue */ 
             send2q((*te_params).tpa_params[i].id, TT_APERIODIC, ET_DEADLINE,
                     (*te_params).tpa_params[i].qt);
-            (*te_params).tpa_params[i].is_ready2q = false;
+            (*te_params).tpa_params[i].q_state = QS_QUEUED;
         }
     }
 
@@ -382,7 +386,7 @@ void server(te_param* te_params, float* utilisation, timer_t* ptimer) {
             /* update te_params */
             (*te_params).tpa_params[i].id = id;
             (*te_params).tpa_params[i].qt = dl;
-            (*te_params).tpa_params[i].is_ready2q = false;
+            (*te_params).tpa_params[i].q_state = QS_WAITING4Q;
 
             /* set next timer event */
             set_new_timer(te_params, ptimer);
@@ -637,7 +641,8 @@ void set_new_timer(te_param* te_params, timer_t* ptimer) {
         }
     }
     for (i=0; i<MAX_APERIODIC; i++) {
-        if (((*te_params).tpa_params[i].qt.tv_sec != 0) &&
+        if (((*te_params).tpa_params[i].q_state != QS_QUEUED) && 
+			((*te_params).tpa_params[i].qt.tv_sec != 0) &&
             (intervaltimer.it_value.tv_sec > (*te_params).tpa_params[i].qt.tv_sec)) {
             intervaltimer.it_value.tv_sec = (*te_params).tpa_params[i].qt.tv_sec;
         }
@@ -648,13 +653,17 @@ void set_new_timer(te_param* te_params, timer_t* ptimer) {
 
     /* mark tasks to be activated next */
     for (i=0; i<MAX_PERIODIC; i++) {
+		(*te_params).tpp_params[i].q_state = QS_WAITING4Q;
         if (intervaltimer.it_value.tv_sec == (*te_params).tpp_params[i].qt.tv_sec) {
-            (*te_params).tpp_params[i].is_ready2q = true;
+            (*te_params).tpp_params[i].q_state = QS_READY2Q;
         }
     }
     for (i=0; i<MAX_APERIODIC; i++) {
+		if ((*te_params).tpa_params[i].q_state != QS_QUEUED) {
+			(*te_params).tpa_params[i].q_state = QS_WAITING4Q;
+		}
         if (intervaltimer.it_value.tv_sec == (*te_params).tpa_params[i].qt.tv_sec) {
-            (*te_params).tpa_params[i].is_ready2q = true;
+            (*te_params).tpa_params[i].q_state = QS_READY2Q;
         }
     }
 
